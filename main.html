@@ -288,6 +288,62 @@
   #scrollNav button.dim { opacity: 0.35; pointer-events: none; }
   #scrollNav svg { width: 18px; height: 18px; stroke: #555; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
+  /* ===== Scalable interface size =====
+     --ui is the base size (phone 13px, desktop 17px); --ui-mult is the user's UI +/- setting. */
+  :root { --ui: 13px; --ui-mult: 1; --ui-fs: calc(var(--ui) * var(--ui-mult)); }
+  @media (min-width: 900px) { :root { --ui: 17px; } }
+
+  #topStrip, #vocabPopover, #vocabTooltip, #scrollNav, #resumeNotice { font-size: var(--ui-fs); }
+
+  #topStrip #controlbar { font-size: var(--ui-fs); gap: 0.8em; padding: 0.55em 0.8em; border-radius: 1.1em; }
+  #topStrip #controlbar label { font-size: 1em; }
+  #topStrip #controlbar select { font-size: 1em; padding: 0.3em 0.55em; border-radius: 0.5em; }
+  #topStrip #controlbar .dropdown-btn { font-size: 1em; padding: 0.4em 0.8em; border-radius: 0.5em; }
+  #topStrip #controlbar button#resetBtn { font-size: 1em; padding: 0.4em 0.8em; border-radius: 0.5em; }
+  #topStrip #controlbar .fsize-group { gap: 0.25em; padding: 0.15em; border-radius: 0.5em; }
+  #topStrip #controlbar .fsize-group button { width: 2em; height: 2em; font-size: 1.1em; border-radius: 0.4em; }
+  #topStrip #controlbar .fsize-group span#fsizeLabel,
+  #topStrip #controlbar .fsize-group span#uiLabel { min-width: 3em; font-size: 0.95em; text-align: center; opacity: 0.85; }
+  #topStrip #controlbar .fsize-group .ui-label { font-size: 0.85em; font-weight: 700; padding-left: 0.4em; opacity: 0.7; }
+  #bmNav #bmCount { font-size: 0.95em; min-width: 4em; }
+
+  #topStrip .dropdown-panel { width: min(21em, calc(100vw - 24px)); padding: 0.9em; border-radius: 0.8em; font-size: var(--ui-fs); }
+  #topStrip .dropdown-panel h4 { font-size: 0.8em; margin-bottom: 0.5em; }
+  #topStrip .dropdown-panel .swatch { width: 1.9em; height: 1.9em; }
+  #topStrip .dropdown-panel .swatch-row { gap: 0.5em; margin-bottom: 0.8em; }
+  #topStrip .dropdown-panel .swatch-row input[type="color"] { width: 2em; height: 2em; }
+  #topStrip .dropdown-panel .data-panel-row p { font-size: 0.85em; }
+  #topStrip .dropdown-panel .data-panel-row button { font-size: 1em; padding: 0.55em 0.8em; border-radius: 0.5em; }
+  #importStatus { font-size: 0.85em; }
+
+  #handleRow #barToggle { font-size: var(--ui-fs); width: 3.4em; height: 1.3em; border-radius: 0.65em; }
+  #handleRow #barToggle svg { width: 1em; height: 1em; }
+
+  /* word pop-up: buttons, meaning editor and note editor */
+  #vocabPopover { min-width: 17em; max-width: 23em; padding: 0.8em; border-radius: 0.8em; }
+  #vocabPopover .pop-word { font-size: 1.2em; margin-bottom: 0.5em; }
+  #vocabPopover .pop-actions { gap: 0.4em; margin-bottom: 0.6em; }
+  #vocabPopover .pop-actions button { font-size: 0.9em; padding: 0.5em 0.6em; border-radius: 0.5em; }
+  #vocabPopover textarea { font-size: 1em; min-height: 5em; padding: 0.5em; border-radius: 0.5em; }
+  #vocabPopover .save-row button { font-size: 0.95em; padding: 0.45em 0.9em; border-radius: 0.5em; }
+  #vocabPopover .section-label { font-size: 0.8em; }
+  #vocabPopover .copied-msg { font-size: 0.85em; }
+  #vocabPopover .existing-note { font-size: 1em; padding: 0.5em 0.7em; }
+
+  #vocabTooltip { max-width: 22em; padding: 0.5em 0.8em; border-radius: 0.5em; }
+
+  #scrollNav { gap: 0.5em; }
+  #scrollNav button { width: 2.7em; height: 2.7em; }
+  #scrollNav svg { width: 1.3em; height: 1.3em; }
+
+  #resumeNotice { padding: 0.55em 1.2em; border-radius: 2em; }
+  .part-count { font-size: calc(var(--ui-fs) * 0.95); }
+
+  /* On a computer screen the toolbar spans the same width as the story text */
+  @media (min-width: 900px) {
+    #topStrip #controlbar { width: min(1200px, calc(100vw - 40px)); max-width: none; justify-content: space-between; }
+  }
+
   @media (max-width: 600px) {
     body { padding-top: 112px; }
     #controlbar { font-size: 12px; gap: 8px; }
@@ -344,9 +400,16 @@
     <button id="fsizePlus" aria-label="Increase font size">+</button>
   </div>
 
+  <div class="ctrl-group fsize-group" id="uiSizeGroup" title="Size of the options, notes and pop-ups">
+    <span class="ui-label">UI</span>
+    <button id="uiMinus" aria-label="Make options smaller">−</button>
+    <span id="uiLabel">100%</span>
+    <button id="uiPlus" aria-label="Make options bigger">+</button>
+  </div>
+
   <div class="dropdown-wrap">
     <button class="dropdown-btn" id="dataToggle">⇅ Notes Data</button>
-    <div class="dropdown-panel" id="dataPanel" style="width:210px;">
+    <div class="dropdown-panel" id="dataPanel">
       <h4>Backup &amp; transfer</h4>
       <p>Your notes and edited meanings live only in this browser. Export a file to back them up or move them to another browser/device.</p>
       <div class="data-panel-row">
@@ -1638,8 +1701,10 @@
     fontColorInput.value = '#2b2620';
     fontSelect.selectedIndex = 0;
     applyFsize(FSIZE_DEFAULT);
+    applyUiMult(1);
     document.querySelectorAll('.swatch.active').forEach(function (s) { s.classList.remove('active'); });
     try {
+      localStorage.removeItem('ashcombe_uisize');
       localStorage.removeItem('ashcombe_bg');
       localStorage.removeItem('ashcombe_fontcolor');
       localStorage.removeItem('ashcombe_font');
@@ -1653,6 +1718,30 @@
       applyFsize(saved ? parseInt(saved, 10) : FSIZE_DEFAULT);
     } catch (e) { applyFsize(FSIZE_DEFAULT); }
   }
+
+  // ---------- UI size (toolbar, pop-ups, notes editor) ----------
+  var UI_MIN = 0.7, UI_MAX = 2.2, UI_STEP = 0.1, uiMult = 1;
+  var uiLabel = document.getElementById('uiLabel');
+
+  function applyUiMult(m) {
+    m = Math.round(Math.max(UI_MIN, Math.min(UI_MAX, m)) * 10) / 10;
+    uiMult = m;
+    document.documentElement.style.setProperty('--ui-mult', String(m));
+    uiLabel.textContent = Math.round(m * 100) + '%';
+    if (typeof topStrip !== 'undefined' && topStrip) updateBodyPadding(); // dock height changes with size
+  }
+  document.getElementById('uiMinus').addEventListener('click', function () {
+    applyUiMult(uiMult - UI_STEP);
+    try { localStorage.setItem('ashcombe_uisize', String(uiMult)); } catch (e) {}
+  });
+  document.getElementById('uiPlus').addEventListener('click', function () {
+    applyUiMult(uiMult + UI_STEP);
+    try { localStorage.setItem('ashcombe_uisize', String(uiMult)); } catch (e) {}
+  });
+  try {
+    var savedUi = parseFloat(localStorage.getItem('ashcombe_uisize'));
+    if (!isNaN(savedUi)) applyUiMult(savedUi);
+  } catch (e) {}
 
   loadPrefs();
   loadFsizePref();
@@ -1844,6 +1933,7 @@
   var tooltip = document.getElementById('vocabTooltip');
 
   var currentWord = null;
+  var popAnchor = null;
 
   function getCurrentGlossText(word) {
     if (glossData[word] && glossData[word].trim()) return glossData[word];
@@ -1864,6 +1954,7 @@
   function openPopover(el) {
     var word = el.getAttribute('data-word');
     currentWord = word;
+    popAnchor = el;
     popWord.textContent = word.charAt(0).toUpperCase() + word.slice(1);
     var existing = notesData[word];
     if (existing && existing.trim()) {
@@ -1885,13 +1976,19 @@
 
   function positionPopover(el) {
     var rect = el.getBoundingClientRect();
-    var popWidth = 280;
+    var popWidth = popover.offsetWidth || 280;
+    var popHeight = popover.offsetHeight || 160;
     var left = rect.left + window.scrollX;
     if (left + popWidth > window.scrollX + document.documentElement.clientWidth - 10) {
       left = window.scrollX + document.documentElement.clientWidth - popWidth - 10;
     }
     if (left < 8) left = 8;
     var top = rect.bottom + window.scrollY + 6;
+    // not enough room below the word (the toolbar sits at the bottom) -> open above it instead
+    var dockTop = topStrip ? topStrip.getBoundingClientRect().top : window.innerHeight;
+    if (rect.bottom + popHeight + 12 > dockTop && rect.top - popHeight - 12 > 0) {
+      top = rect.top + window.scrollY - popHeight - 6;
+    }
     popover.style.left = left + 'px';
     popover.style.top = top + 'px';
   }
@@ -1970,6 +2067,7 @@
     noteLabel.style.display = 'block';
     noteText.style.display = 'block';
     saveRow.style.display = 'flex';
+    if (popAnchor) positionPopover(popAnchor);
     noteText.focus();
   });
 
@@ -1978,6 +2076,7 @@
     glossLabel.style.display = 'block';
     glossTextarea.style.display = 'block';
     glossSaveRow.style.display = 'flex';
+    if (popAnchor) positionPopover(popAnchor);
     glossTextarea.focus();
   });
 
