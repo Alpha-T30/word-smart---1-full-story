@@ -256,6 +256,38 @@
   }
   #resumeNotice { bottom: auto; top: 14px; }
 
+  /* bookmarks */
+  strong.vocab.bookmarked::after {
+    content: "🔖"; font-size: 0.55em; margin-left: 2px; vertical-align: super; opacity: 0.9;
+  }
+  strong.vocab.bookmarked { text-decoration: underline dotted; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  @keyframes bmFlash {
+    0% { background: rgba(255,200,0,0.85); }
+    100% { background: transparent; }
+  }
+  strong.vocab.flash { animation: bmFlash 1.4s ease-out; }
+  #topStrip #controlbar #bmToggle.on { background: var(--accent); color: var(--popover-bg); }
+  #bmNav { gap: 6px; }
+  #bmNav #bmCount {
+    min-width: 46px; text-align: center; font-size: 12px; opacity: 0.85; white-space: nowrap;
+  }
+  #bmNav button.dropdown-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* small scroll shortcuts, bottom-right, sits just above the dock */
+  #scrollNav {
+    position: fixed; right: calc(env(safe-area-inset-right, 0px) + 10px); bottom: 70px; z-index: 900;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  #scrollNav button {
+    width: 34px; height: 34px; border-radius: 50%; padding: 0;
+    border: 1px solid rgba(0,0,0,0.14); background: rgba(236,236,236,0.95);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.22); transition: opacity 0.2s ease, background 0.15s ease;
+  }
+  #scrollNav button:hover { background: #ffffff; }
+  #scrollNav button.dim { opacity: 0.35; pointer-events: none; }
+  #scrollNav svg { width: 18px; height: 18px; stroke: #555; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
   @media (max-width: 600px) {
     body { padding-top: 112px; }
     #controlbar { font-size: 12px; gap: 8px; }
@@ -326,11 +358,23 @@
     </div>
   </div>
 
+  <button class="dropdown-btn" id="bmToggle" title="Switch bookmark reading mode on / off">🔖 Bookmarks</button>
+  <div class="ctrl-group" id="bmNav" style="display:none">
+    <button class="dropdown-btn" id="bmPrev" title="Previous bookmarked word">‹ Prev</button>
+    <span id="bmCount">0</span>
+    <button class="dropdown-btn" id="bmNext" title="Next bookmarked word">Next ›</button>
+  </div>
+
   <button id="resetBtn" title="Reset all settings to default">Reset</button>
 </div>
 <div id="handleRow">
   <button id="barToggle" aria-label="Hide or show toolbar" title="Hide / show toolbar"><svg viewBox="0 0 24 24"><polyline points="6 15 12 9 18 15"/></svg></button>
 </div>
+</div>
+
+<div id="scrollNav" aria-label="Scroll shortcuts">
+  <button id="scrollTopBtn" aria-label="Scroll to top" title="Go to top"><svg viewBox="0 0 24 24"><polyline points="6 15 12 9 18 15"/><line x1="6" y1="5" x2="18" y2="5"/></svg></button>
+  <button id="scrollBottomBtn" aria-label="Scroll to bottom" title="Go to bottom"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/><line x1="6" y1="19" x2="18" y2="19"/></svg></button>
 </div>
 
 <div id="resumeNotice">Resumed where you left off</div>
@@ -1455,6 +1499,7 @@
     <button id="speakBtn">🔊 Speak</button>
     <button id="editGlossBtn">✎ Edit Meaning</button>
     <button id="noteBtn">🗒 Add Note</button>
+    <button id="bookmarkBtn">🔖 Bookmark</button>
   </div>
   <div class="section-label" id="glossLabel">Pronunciation &amp; meaning</div>
   <textarea id="glossTextarea" placeholder="e.g. (কমপেলিং: জোরালো ও শক্তিশালী)"></textarea>
@@ -1620,6 +1665,34 @@
   try { var r1 = localStorage.getItem(NOTES_KEY); if (r1) notesData = JSON.parse(r1); } catch (e) {}
   try { var r2 = localStorage.getItem(GLOSS_KEY); if (r2) glossData = JSON.parse(r2); } catch (e) {}
 
+  var BM_KEY = 'ashcombe_vocab_bookmarks';
+  var bookmarks = {};
+  try {
+    var r3 = localStorage.getItem(BM_KEY);
+    if (r3) JSON.parse(r3).forEach(function (w) { bookmarks[w] = true; });
+  } catch (e) {}
+  function saveBookmarks() { try { localStorage.setItem(BM_KEY, JSON.stringify(Object.keys(bookmarks))); } catch (e) {} }
+  // The "main" occurrence of a word = the one that has its Bangla meaning shown right after it.
+  function mainSpanFor(word) {
+    var sel = cssEscape(word);
+    var g = document.querySelector('span.gloss[data-for="' + sel + '"]');
+    if (g) {
+      var n = g.previousSibling, steps = 0;
+      while (n && steps < 6) {
+        if (n.nodeType === 1 && n.matches('strong.vocab[data-word="' + sel + '"]')) return n;
+        n = n.previousSibling;
+        steps++;
+      }
+    }
+    return document.querySelector('strong.vocab[data-word="' + sel + '"]'); // fallback: first occurrence
+  }
+  function refreshBookmark(word) {
+    var main = mainSpanFor(word);
+    document.querySelectorAll('strong.vocab[data-word="' + cssEscape(word) + '"]').forEach(function (el) {
+      el.classList.toggle('bookmarked', !!bookmarks[word] && el === main);
+    });
+  }
+
   function saveNotesToStorage() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notesData)); } catch (e) {} }
   function saveGlossToStorage() { try { localStorage.setItem(GLOSS_KEY, JSON.stringify(glossData)); } catch (e) {} }
 
@@ -1656,6 +1729,7 @@
 
   Object.keys(notesData).forEach(function (w) { if (notesData[w] && notesData[w].trim()) refreshWordHighlight(w); });
   Object.keys(glossData).forEach(function (w) { if (glossData[w] && glossData[w].trim()) refreshGlossDisplay(w); });
+  Object.keys(bookmarks).forEach(refreshBookmark);
 
   // ---------- Export / Import ----------
   var exportBtn = document.getElementById('exportBtn');
@@ -1675,7 +1749,8 @@
       exportedFrom: 'The Ashcombe Secret — Interactive Edition',
       exportedAt: new Date().toISOString(),
       notes: notesData,
-      glosses: glossData
+      glosses: glossData,
+      bookmarks: Object.keys(bookmarks)
     };
     var json = JSON.stringify(payload, null, 2);
     var filename = 'ashcombe-notes-' + new Date().toISOString().slice(0, 10) + '.json';
@@ -1726,11 +1801,18 @@
         Object.keys(importedGlosses).forEach(function (w) {
           if (importedGlosses[w] && importedGlosses[w].trim()) { glossData[w] = importedGlosses[w]; gCount++; }
         });
+        var importedBm = Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [];
+        var bCount = 0;
+        importedBm.forEach(function (w) { if (typeof w === 'string' && w) { bookmarks[w] = true; bCount++; } });
         saveNotesToStorage();
         saveGlossToStorage();
+        saveBookmarks();
         Object.keys(importedNotes).forEach(refreshWordHighlight);
         Object.keys(importedGlosses).forEach(refreshGlossDisplay);
-        showImportStatus('Imported ' + nCount + ' notes, ' + gCount + ' meanings.');
+        importedBm.forEach(refreshBookmark);
+        bmIdx = -1;
+        updateBmCount();
+        showImportStatus('Imported ' + nCount + ' notes, ' + gCount + ' meanings, ' + bCount + ' bookmarks.');
       } catch (e) {
         showImportStatus('That file could not be read.', true);
       }
@@ -1795,6 +1877,7 @@
     hideAllEditors();
     noteText.value = existing || '';
     glossTextarea.value = getCurrentGlossText(word);
+    document.getElementById('bookmarkBtn').textContent = bookmarks[word] ? '🔖 Remove Bookmark' : '🔖 Bookmark';
 
     popover.style.display = 'block';
     positionPopover(el);
@@ -1869,6 +1952,17 @@
     utter.lang = 'en-US';
     utter.rate = 0.9;
     window.speechSynthesis.speak(utter);
+  });
+
+  document.getElementById('bookmarkBtn').addEventListener('click', function () {
+    if (!currentWord) return;
+    if (bookmarks[currentWord]) delete bookmarks[currentWord];
+    else bookmarks[currentWord] = true;
+    saveBookmarks();
+    refreshBookmark(currentWord);
+    this.textContent = bookmarks[currentWord] ? '🔖 Remove Bookmark' : '🔖 Bookmark';
+    bmIdx = -1;
+    updateBmCount();
   });
 
   noteBtn.addEventListener('click', function () {
@@ -1995,6 +2089,8 @@
     document.documentElement.style.scrollPaddingTop = '20px';
     // keep enough room at the end of the story so the dock never hides the last lines
     document.body.style.paddingBottom = (topStrip.offsetHeight + 60) + 'px';
+    var nav = document.getElementById('scrollNav');
+    if (nav) nav.style.bottom = (topStrip.offsetHeight + 14) + 'px';
   }
 
   function setBarCollapsed(collapsed, save) {
@@ -2016,6 +2112,91 @@
   try {
     setBarCollapsed(localStorage.getItem('ashcombe_bar_collapsed') === '1', false);
   } catch (e) { setBarCollapsed(false, false); }
+
+  // ---------- Bookmark reading mode ----------
+  var bmToggle = document.getElementById('bmToggle');
+  var bmNav = document.getElementById('bmNav');
+  var bmPrev = document.getElementById('bmPrev');
+  var bmNext = document.getElementById('bmNext');
+  var bmCount = document.getElementById('bmCount');
+  var bmMode = false;
+  var bmIdx = -1;      // index of the bookmark we last jumped to
+  var bmNavTime = 0;   // when we last jumped (so quick repeated taps keep moving forward/back)
+
+  function bmList() { return Array.prototype.slice.call(document.querySelectorAll('strong.vocab.bookmarked')); }
+  function bmTargetY() { return Math.round(window.innerHeight * 0.3); }
+
+  function updateBmCount() {
+    var n = bmList().length;
+    if (!n) bmCount.textContent = 'none';
+    else bmCount.textContent = ((bmIdx >= 0 && bmIdx < n) ? (bmIdx + 1) : '–') + ' / ' + n;
+    bmPrev.disabled = !n;
+    bmNext.disabled = !n;
+  }
+
+  function bmGo(dir) {
+    var list = bmList(), n = list.length, idx = -1, i;
+    if (!n) return;
+    if (bmIdx >= 0 && bmIdx < n && Date.now() - bmNavTime < 1500) {
+      idx = (bmIdx + dir + n) % n;
+    } else {
+      var ty = bmTargetY();
+      if (dir > 0) {
+        for (i = 0; i < n; i++) { if (list[i].getBoundingClientRect().top > ty + 8) { idx = i; break; } }
+        if (idx < 0) idx = 0;
+      } else {
+        for (i = n - 1; i >= 0; i--) { if (list[i].getBoundingClientRect().top < ty - 8) { idx = i; break; } }
+        if (idx < 0) idx = n - 1;
+      }
+    }
+    bmIdx = idx;
+    bmNavTime = Date.now();
+    var el = list[idx];
+    var y = el.getBoundingClientRect().top + window.scrollY - bmTargetY();
+    window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+    setTimeout(function () { el.classList.remove('flash'); }, 1500);
+    updateBmCount();
+  }
+
+  function setBmMode(on, save) {
+    bmMode = on;
+    bmToggle.classList.toggle('on', on);
+    bmNav.style.display = on ? 'flex' : 'none';
+    bmIdx = -1;
+    updateBmCount();
+    updateBodyPadding();
+    if (save) { try { localStorage.setItem('ashcombe_bm_mode', on ? '1' : '0'); } catch (e) {} }
+  }
+
+  bmToggle.addEventListener('click', function (e) { e.stopPropagation(); setBmMode(!bmMode, true); });
+  bmNext.addEventListener('click', function () { bmGo(1); });
+  bmPrev.addEventListener('click', function () { bmGo(-1); });
+
+  try { setBmMode(localStorage.getItem('ashcombe_bm_mode') === '1', false); } catch (e) { setBmMode(false, false); }
+
+  // ---------- Scroll to top / bottom ----------
+  var scrollTopBtn = document.getElementById('scrollTopBtn');
+  var scrollBottomBtn = document.getElementById('scrollBottomBtn');
+
+  scrollTopBtn.addEventListener('click', function () {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  scrollBottomBtn.addEventListener('click', function () {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+  });
+
+  function updateScrollButtons() {
+    var y = window.scrollY || document.documentElement.scrollTop;
+    var maxY = document.documentElement.scrollHeight - window.innerHeight;
+    scrollTopBtn.classList.toggle('dim', y < 40);
+    scrollBottomBtn.classList.toggle('dim', y > maxY - 40);
+  }
+  window.addEventListener('scroll', updateScrollButtons, { passive: true });
+  window.addEventListener('resize', updateScrollButtons);
+  updateScrollButtons();
 
   // ---------- Reading position memory ----------
   var SCROLL_KEY = 'ashcombe_scroll_anchor';
@@ -2061,7 +2242,7 @@
   }
 
   if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(function () { updateBodyPadding(); setTimeout(restoreScrollPosition, 80); });
+    document.fonts.ready.then(function () { updateBodyPadding(); updateScrollButtons(); setTimeout(restoreScrollPosition, 80); });
   } else {
     window.addEventListener('load', function () { updateBodyPadding(); setTimeout(restoreScrollPosition, 150); });
   }
