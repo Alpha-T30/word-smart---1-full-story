@@ -1990,10 +1990,30 @@
     });
   }
 
+  function parseGloss(text) {
+    var t = (text || '').trim();
+    if (t.charAt(0) === '(' && t.charAt(t.length - 1) === ')') t = t.slice(1, -1);
+    var i = t.indexOf(':');
+    return i < 0 ? { p: '', m: t.trim() } : { p: t.slice(0, i).trim(), m: t.slice(i + 1).trim() };
+  }
   function refreshGlossDisplay(word) {
     var glossEls = document.querySelectorAll('span.gloss[data-for="' + cssEscape(word) + '"]');
     var custom = glossData[word];
-    if (custom && custom.trim()) {
+    var hasCustom = !!(custom && custom.trim());
+    // synonyms page: this word's row shows pronunciation and meaning separately
+    var cbRow = document.querySelector('#synOverlay .word-check[data-word="' + cssEscape(word) + '"]');
+    var row = cbRow ? cbRow.closest('.syn-row') : null;
+    if (row) {
+      var pEl = row.querySelector('.syn-p'), mEl = row.querySelector('.syn-m');
+      if (pEl && mEl) {
+        if (hasCustom) { var g = parseGloss(custom); pEl.textContent = g.p; mEl.textContent = g.m; }
+        else if (pEl.hasAttribute('data-orig')) { pEl.textContent = pEl.getAttribute('data-orig'); mEl.textContent = mEl.getAttribute('data-orig'); }
+      }
+    }
+    if (!hasCustom) {
+      glossEls.forEach(function (el) { if (el.hasAttribute('data-orig')) el.textContent = el.getAttribute('data-orig'); });
+    }
+    if (hasCustom) {
       if (glossEls.length) {
         glossEls.forEach(function (el) { el.textContent = custom.trim(); });
       } else {
@@ -2012,6 +2032,9 @@
   }
 
   Object.keys(notesData).forEach(function (w) { if (notesData[w] && notesData[w].trim()) refreshWordHighlight(w); });
+  document.querySelectorAll('span.gloss, #synOverlay .syn-p, #synOverlay .syn-m').forEach(function (el) {
+    if (!el.hasAttribute('data-orig')) el.setAttribute('data-orig', el.textContent);
+  });
   Object.keys(glossData).forEach(function (w) { if (glossData[w] && glossData[w].trim()) refreshGlossDisplay(w); });
   Object.keys(bookmarks).forEach(refreshBookmark);
 
@@ -2181,6 +2204,18 @@
     var inOv = !!el.closest('#synOverlay');           // the synonyms page scrolls by itself, so use screen coordinates there
     var sx = inOv ? 0 : window.scrollX, sy = inOv ? 0 : window.scrollY;
     popover.style.position = inOv ? 'fixed' : 'absolute';
+    // On the synonyms page the pop-up is fixed on the screen, so keep it inside the part of the screen
+    // that is really visible. When the phone keyboard opens, that visible part gets smaller.
+    var vv = window.visualViewport;
+    var vTop = (inOv && vv) ? vv.offsetTop : 0;
+    var vBottom = (inOv && vv) ? vv.offsetTop + vv.height : window.innerHeight;
+    if (inOv) {
+      popover.style.maxHeight = Math.max(120, vBottom - vTop - 16) + 'px';
+      popover.style.overflowY = 'auto';
+    } else {
+      popover.style.maxHeight = '';
+      popover.style.overflowY = '';
+    }
     var popWidth = popover.offsetWidth || 280;
     var popHeight = popover.offsetHeight || 160;
     var left = rect.left + sx;
@@ -2189,13 +2224,32 @@
     }
     if (left < 8) left = 8;
     var top = rect.bottom + sy + 6;
-    // not enough room below the word (the toolbar sits at the bottom) -> open above it instead
+    // not enough room below the word (the toolbar / keyboard is there) -> open above it instead
     var dockTop = topStrip ? topStrip.getBoundingClientRect().top : window.innerHeight;
-    if (rect.bottom + popHeight + 12 > dockTop && rect.top - popHeight - 12 > 0) {
+    var limit = inOv ? Math.min(dockTop, vBottom) : dockTop;
+    if (rect.bottom + popHeight + 12 > limit && rect.top - popHeight - 12 > vTop) {
       top = rect.top + sy - popHeight - 6;
+    }
+    if (inOv) {
+      var maxTop = vBottom - popHeight - 8;           // finally: make sure it sits fully on the visible screen
+      if (top > maxTop) top = maxTop;
+      if (top < vTop + 8) top = vTop + 8;
     }
     popover.style.left = left + 'px';
     popover.style.top = top + 'px';
+  }
+
+  // when the keyboard opens or closes, move the pop-up so it is never hidden behind the keyboard
+  if (window.visualViewport) {
+    var refitPopover = function () {
+      if (popover.style.display === 'block' && popover.style.position === 'fixed' && popAnchor) {
+        positionPopover(popAnchor);
+        var ae = document.activeElement;
+        if (ae && popover.contains(ae) && ae.scrollIntoView) ae.scrollIntoView({ block: 'nearest' });
+      }
+    };
+    window.visualViewport.addEventListener('resize', refitPopover);
+    window.visualViewport.addEventListener('scroll', refitPopover);
   }
 
   function closePopover() {
@@ -2497,14 +2551,51 @@
 
   // ---------- Synonyms / antonyms page ----------
   var synOverlay = document.getElementById('synOverlay');
+  // remember where you were on this page: the first word row visible under the header
+  var SYN_SCROLL_KEY = 'ashcombe_syn_scroll_word';
+  function saveSynScroll() {
+    if (!synOverlay.classList.contains('open')) return;
+    try {
+      if (synOverlay.scrollTop < 40) { localStorage.removeItem(SYN_SCROLL_KEY); return; }
+      var hdr = document.getElementById('synHeader').getBoundingClientRect().bottom;
+      var rows = synOverlay.querySelectorAll('.syn-row');
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].getBoundingClientRect().bottom > hdr + 4) {
+          var cb = rows[i].querySelector('.word-check');
+          if (cb) localStorage.setItem(SYN_SCROLL_KEY, cb.getAttribute('data-word'));
+          return;
+        }
+      }
+    } catch (e) {}
+  }
+  function restoreSynScroll() {
+    var w = null;
+    try { w = localStorage.getItem(SYN_SCROLL_KEY); } catch (e) {}
+    if (!w) { synOverlay.scrollTop = 0; return; }
+    var cb = synOverlay.querySelector('.word-check[data-word="' + cssEscape(w) + '"]');
+    if (!cb) return;
+    var hdrH = document.getElementById('synHeader').offsetHeight;
+    var y = cb.closest('.syn-row').getBoundingClientRect().top - synOverlay.getBoundingClientRect().top + synOverlay.scrollTop - hdrH - 6;
+    synOverlay.scrollTop = Math.max(0, y);
+  }
+  var synScrollTimer = null;
+  synOverlay.addEventListener('scroll', function () {
+    if (synScrollTimer) clearTimeout(synScrollTimer);
+    synScrollTimer = setTimeout(saveSynScroll, 300);
+  }, { passive: true });
+  window.addEventListener('beforeunload', saveSynScroll);
+
   function setSynOpen(open) {
+    if (!open && synOverlay.classList.contains('open')) saveSynScroll();
     synOverlay.classList.toggle('open', open);
     document.documentElement.style.overflow = open ? 'hidden' : '';
     document.getElementById('synToggle').textContent = open ? '📖 Back to story' : '🔁 Synonyms / Antonyms';
     closePopover();
     tooltip.style.display = 'none'; tooltipTarget = null;
     bmIdx = -1; updateBmCount();
+    if (open) restoreSynScroll();
     updateScrollButtons();
+    try { localStorage.setItem('ashcombe_syn_open', open ? '1' : '0'); } catch (e) {}
   }
   synOverlay.addEventListener('scroll', function () {
     if (popover.style.display === 'block' && Math.abs(synOverlay.scrollTop - popScrollTop) > 4) closePopover();   // a fixed pop-up would drift away from its word
@@ -2652,10 +2743,15 @@
     }, 1800);
   }
 
+  function restoreSynState() {
+    var wasOpen = false;
+    try { wasOpen = localStorage.getItem('ashcombe_syn_open') === '1'; } catch (e) {}
+    if (wasOpen) setSynOpen(true);
+  }
   if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(function () { updateBodyPadding(); updateScrollButtons(); setTimeout(restoreScrollPosition, 80); });
+    document.fonts.ready.then(function () { updateBodyPadding(); updateScrollButtons(); setTimeout(restoreScrollPosition, 80); setTimeout(restoreSynState, 300); });
   } else {
-    window.addEventListener('load', function () { updateBodyPadding(); setTimeout(restoreScrollPosition, 150); });
+    window.addEventListener('load', function () { updateBodyPadding(); setTimeout(restoreScrollPosition, 150); setTimeout(restoreSynState, 350); });
   }
 
 })();
